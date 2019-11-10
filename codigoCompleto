@@ -1,0 +1,320 @@
+//--------------------------------------------------------------------------------------------------------
+//  BIBLIOTECA NECESSÁRIA PARA UTILIZAR O SENSOR ULTRASSÔNICO
+//--------------------------------------------------------------------------------------------------------
+#include <Ultrasonic.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Wire.h>
+
+//--------------------------------------------------------------------------------------------------------
+//  DEFINIÇÂO DOS PINOS LEDS CORRESPONDENTES AO NÌVEL DE ÁGUA
+//--------------------------------------------------------------------------------------------------------
+#define NIVEL_GREEN_CAIXA     19
+#define NIVEL_YELLOW_CAIXA    18
+#define NIVEL_RED_CAIXA        5
+
+#define NIVEL_GREEN_CISTERNA  33
+#define NIVEL_YELLOW_CISTERNA 25
+#define NIVEL_RED_CISTERNA    26
+
+//--------------------------------------------------------------------------------------------------------
+//  DEFINIÇÂO DOS PINOS DE ACIONAMENTO DA BOMBA D'ÁGUA E LÂMPADA UV
+//--------------------------------------------------------------------------------------------------------
+//Definição do PINO responsável por acionar o RELE
+#define PIN_RELE_BOMBA         12
+#define PIN_RELE_LAMPADA        4 
+
+//--------------------------------------------------------------------------------------------------------
+//  DEFINIÇÃO DOS PINOS DE CADA SENSOR ULTRASSÔNICO
+//--------------------------------------------------------------------------------------------------------
+#define PIN_ECHO_CAIXA        16
+#define PIN_TRIGGER_CAIXA     17
+
+#define PIN_ECHO_CISTERNA     14
+#define PIN_TRIGGER_CISTERNA  27
+
+//--------------------------------------------------------------------------------------------------------
+//  CRIAÇÃO E DEFINIÇÃO DOS PARÂMETROS DE CADA OBJETO
+//--------------------------------------------------------------------------------------------------------
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+Ultrasonic ultrasonicCAIXA(PIN_TRIGGER_CAIXA, PIN_ECHO_CAIXA);
+Ultrasonic ultrasonicCISTERNA(PIN_TRIGGER_CISTERNA, PIN_ECHO_CISTERNA);
+
+//--------------------------------------------------------------------------------------------------------
+//  CONFIGURANDO NOME E SENHA DA REDE WIFI QUE O ESP IRÁ SE CONECTAR
+//--------------------------------------------------------------------------------------------------------
+const char* ssid = "mobileServer";
+const char* password = "+&':Hgr8Vf";
+
+//--------------------------------------------------------------------------------------------------------
+//  CONFIGURANDO SERVIÇO MQTT COM O QUAL IRÁ FAZER PUBLISH E SUBSCRIBE
+//--------------------------------------------------------------------------------------------------------
+const char* mqttServer = "soldier.cloudmqtt.com";
+const char* mqttID = "etaIOT";
+const char* mqttUser = "rvrcpmvg";
+const char* mqttPass = "P_EsZbcpMxvU";
+const int   mqttPort = 10210;
+
+//--------------------------------------------------------------------------------------------------------
+//  DEFINIÇÃO DO CONSTANTES E VARIÁVEIS DO SISTEMA
+//--------------------------------------------------------------------------------------------------------
+const int intervaloLeitura = 900; //(ms)
+
+unsigned long ultimaLeituraCaixa = 0;
+unsigned long leituraAtualCaixa = 0;
+
+unsigned long ultimaLeituraCisterna = 0;
+unsigned long leituraAtualCisterna = 0;
+
+int distanciaReservatorioCaixa;
+int distanciaReservatorioCisterna;
+
+char distanceCaixa[8];
+char distanceCisterna[8];
+
+//--------------------------------------------------------------------------------------------------------
+//  FUNÇÃO QUE CONFIGURA CADA UM DOS PINOS COMO SAIDA
+//--------------------------------------------------------------------------------------------------------
+void configurarPinos()
+{
+  pinMode(NIVEL_GREEN_CAIXA,         OUTPUT);  
+  pinMode(NIVEL_YELLOW_CAIXA,        OUTPUT);
+  pinMode(NIVEL_RED_CAIXA,           OUTPUT);
+
+  pinMode(NIVEL_GREEN_CISTERNA,      OUTPUT);  
+  pinMode(NIVEL_YELLOW_CISTERNA,     OUTPUT);
+  pinMode(NIVEL_RED_CISTERNA,        OUTPUT);
+
+  pinMode(PIN_RELE_BOMBA,            OUTPUT);
+  pinMode(PIN_RELE_LAMPADA,          OUTPUT);  
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  Definição do intervalo de leitura
+//--------------------------------------------------------------------------------------------------------
+void setup()
+{
+  Serial.begin(115200); 
+  configurarPinos();    
+  Serial.println("Lendo dados do sensor…");
+  
+  setupWifi();
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  DURANTE O FUNCIONAMENTO DO SISTEMA O LOOP PERMANECE ATIVO FAZENDO CHAMADAS DE FUNÇÃO
+//--------------------------------------------------------------------------------------------------------
+void loop()
+{
+  if (!client.connected()) {
+    reconectaMQTT();
+  }
+  if (!client.loop()) {
+    client.connect(mqttID);
+  }
+  Serial.print(""); 
+  
+  publicarDados();
+  
+  verificarDistanciaCaixa();
+  verificarDistanciaCisterna();
+  acionaRele();  
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  CONECTA A REDE WIFI
+//--------------------------------------------------------------------------------------------------------
+void setupWifi()
+{
+  delay(10);
+  Serial.println();
+  Serial.print("Conectando à rede ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  
+  Serial.println("");
+  Serial.print("WiFi conectado - endereço IP do ESP: ");
+  Serial.println(WiFi.localIP());
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  CONECTA/RECONECTA AO BROKER MQTT
+//--------------------------------------------------------------------------------------------------------
+void reconectaMQTT()
+{
+  while (!client.connected()) {
+    Serial.print("Conexão MQTT ");
+
+    if (client.connect(mqttID, mqttUser, mqttPass)) {
+      Serial.println("concluída");
+      client.subscribe("etaIOT/rele");
+    } else {
+      Serial.print("falhou. Código de erro =");
+      Serial.print(client.state());
+      Serial.println(", nova tentativa em 5 segundos!");
+      delay(5000);
+    }
+  }
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  PUBLICA DADOS
+//--------------------------------------------------------------------------------------------------------
+void publicarDados()
+{  
+  dtostrf(distanciaReservatorioCaixa, 1, 2, distanceCaixa);
+  dtostrf(distanciaReservatorioCisterna, 1, 2, distanceCisterna);
+
+  client.publish("etaIOT/caixa", distanceCaixa);
+  client.publish("etaIOT/cisterna", distanceCisterna);
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  CALLBACK - FAZ PAYLOAD NOS TOPICOS QUANDO HOUVER ALTERAÇÃO DE ESTADO
+//--------------------------------------------------------------------------------------------------------
+void callback(char* topic, byte* payload, unsigned int length)
+{
+  Serial.print("Mensagem chegou ao tópico: ");
+  Serial.print(topic);
+  Serial.print(". Mensagem: ");
+  
+  String msg;
+  
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+    msg += (char)payload[i];
+  }
+  
+  Serial.println();
+  
+  if (String(topic) == "etaIOT/rele") {
+    Serial.print("Alterando o RELE para ");
+    if (msg == "true") {
+      Serial.println("ativo");
+      digitalWrite(PIN_RELE_BOMBA, HIGH);
+    }
+    if (msg == "false") {
+      Serial.println("inativo");
+      digitalWrite(PIN_RELE_BOMBA, LOW);
+    }
+  }
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  FAZ A LEITURA DA DISTANCIA AFERIDA PELO SENSOR ULTRASSÔNICO DA CISTERNA E CONVERTE EM PORCENTAGEM
+//--------------------------------------------------------------------------------------------------------
+int getDistanceCaixa()
+{
+    long microsec = ultrasonicCAIXA.timing();
+    delay(100);
+    distanciaReservatorioCaixa = ultrasonicCAIXA.convert(microsec, Ultrasonic::CM);
+   
+    return distanciaReservatorioCaixa;
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  FAZ A LEITURA DA DISTANCIA AFERIDA PELO SENSOR ULTRASSÔNICO DA CISTERNA E CONVERTE EM PORCENTAGEM
+//--------------------------------------------------------------------------------------------------------
+int getDistanceCisterna()
+{
+    long microsec = ultrasonicCISTERNA.timing();
+    delay(100);
+    distanciaReservatorioCisterna = ultrasonicCISTERNA.convert(microsec, Ultrasonic::CM);
+     
+    return distanciaReservatorioCisterna;
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  FUNÇÃO QUE ATIVA/DESATIVA RELE
+//--------------------------------------------------------------------------------------------------------
+void acionaRele()
+{
+  if (getDistanceCaixa() > 9 && getDistanceCisterna() < 13)
+  {
+    do{
+      digitalWrite(PIN_RELE_BOMBA, LOW);
+      Serial.println("BOMBA LIGADA");
+      digitalWrite(PIN_RELE_LAMPADA, LOW);
+      Serial.println("TRATAMENTO INICIADO");
+      Serial.print("Distancia da Caixa D'água: ");
+      Serial.println(getDistanceCaixa()); 
+      Serial.print("Distancia da Caixa Cisterna: "); 
+      Serial.println(getDistanceCisterna());
+      Serial.println("");       
+    }while (getDistanceCaixa() > 3 && getDistanceCisterna() < 13);
+  }
+  else if (getDistanceCaixa() < 3 || getDistanceCisterna() >= 13)
+  {
+    digitalWrite(PIN_RELE_BOMBA, HIGH);
+    Serial.println("Bomba Desligada");
+    digitalWrite(PIN_RELE_LAMPADA, HIGH);
+    Serial.println("Tratamento Finalizado");
+    Serial.print("Distancia da Caixa D'água: ");
+    Serial.println(getDistanceCaixa());
+    Serial.print("Distancia da Caixa Cisterna: ");   
+    Serial.println(getDistanceCisterna());
+    Serial.println("");
+  }  
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  FUNÇÃO QUE VERIFICA O NÍVEL DA CAIXA D'ÁGUA ATRAVÉS DO SENSOR ULTRASSÔNICO E ACENDE LED CORRESPONDENTE
+//--------------------------------------------------------------------------------------------------------
+void verificarDistanciaCaixa()
+{ 
+  //esse FOR objetiva apagar todos os LEDS que estejam acesos.
+  for(int i=NIVEL_GREEN_CAIXA ; i<=NIVEL_RED_CAIXA; i++)
+  {
+    digitalWrite(i, LOW);    
+  }
+  //caso a distancia lida seja menor ou igual a 4, acenderemos o LED VERDE  
+  if(getDistanceCaixa() <= 4 )
+  {
+    digitalWrite(NIVEL_GREEN_CAIXA, HIGH);
+  }
+  //caso a distancia lida seja menor ou igual a 6, acenderemos o LED AMARELO
+  else if(getDistanceCaixa() <= 6)
+  {
+    digitalWrite(NIVEL_YELLOW_CAIXA, HIGH);
+  }else
+  //caso a distancia lida seja menor ou igual a 11, acenderemos o LED VERMELHO
+  {
+    digitalWrite(NIVEL_RED_CAIXA, HIGH);
+  }
+}
+
+//--------------------------------------------------------------------------------------------------------
+//  FUNÇÃO QUE VERIFICA O NÍVEL DA CISTERNA ATRAVÉS DO SENSOR ULTRASSÔNICO E ACENDE LED CORRESPONDENTE
+//--------------------------------------------------------------------------------------------------------
+void verificarDistanciaCisterna()
+{ 
+  //esse FOR objetiva apagar todos os LEDS que estejam acesos.
+  for(int i=NIVEL_GREEN_CISTERNA ; i<=NIVEL_RED_CISTERNA; i++)
+  {
+    digitalWrite(i, LOW);    
+  }
+    
+  //caso a distancia lida seja menor ou igual a 4, acenderemos o LED VERDE
+  if(getDistanceCisterna() <= 4 )
+  {
+    digitalWrite(NIVEL_GREEN_CISTERNA, HIGH);
+  }
+  //caso a distancia lida seja menor ou igual a 6, acenderemos o LED VERDE
+  else if(getDistanceCisterna() <= 6)
+  {
+    digitalWrite(NIVEL_YELLOW_CISTERNA, HIGH);
+  }else
+  //caso a distancia lida seja menor ou igual a 12, acenderemos o LED VERMELHO
+  {
+    digitalWrite(NIVEL_RED_CISTERNA, HIGH);
+  }
+}
