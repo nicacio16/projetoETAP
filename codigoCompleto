@@ -45,17 +45,17 @@ Ultrasonic ultrasonicCISTERNA(PIN_TRIGGER_CISTERNA, PIN_ECHO_CISTERNA);
 //--------------------------------------------------------------------------------------------------------
 //  CONFIGURANDO NOME E SENHA DA REDE WIFI QUE O ESP IRÁ SE CONECTAR
 //--------------------------------------------------------------------------------------------------------
-const char* ssid = "mobileServer";
-const char* password = "+&':Hgr8Vf";
+const char* ssid = "ssidDaRede";
+const char* password = "passwordDaRede";
 
 //--------------------------------------------------------------------------------------------------------
 //  CONFIGURANDO SERVIÇO MQTT COM O QUAL IRÁ FAZER PUBLISH E SUBSCRIBE
 //--------------------------------------------------------------------------------------------------------
 const char* mqttServer = "soldier.cloudmqtt.com";
 const char* mqttID = "etaIOT";
-const char* mqttUser = "rvrcpmvg";
-const char* mqttPass = "P_EsZbcpMxvU";
-const int   mqttPort = 10210;
+const char* mqttUser = "mqttUser";
+const char* mqttPass = "mqttPass";
+const int   mqttPort = mqttPort;
 
 //--------------------------------------------------------------------------------------------------------
 //  DEFINIÇÃO DO CONSTANTES E VARIÁVEIS DO SISTEMA
