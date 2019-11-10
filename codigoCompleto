@@ -20,7 +20,6 @@
 //--------------------------------------------------------------------------------------------------------
 //  DEFINIÇÂO DOS PINOS DE ACIONAMENTO DA BOMBA D'ÁGUA E LÂMPADA UV
 //--------------------------------------------------------------------------------------------------------
-//Definição do PINO responsável por acionar o RELE
 #define PIN_RELE_BOMBA         12
 #define PIN_RELE_LAMPADA        4 
 
