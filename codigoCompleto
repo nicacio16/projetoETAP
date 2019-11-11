@@ -91,7 +91,7 @@ void configurarPinos()
 }
 
 //--------------------------------------------------------------------------------------------------------
-//  Definição do intervalo de leitura
+//  ESTABELECE ALGUMAS CONFIGURAÇÔES INICIAIS PARA O FUNCIONAMENTO DO MICROCONTROLADOR
 //--------------------------------------------------------------------------------------------------------
 void setup()
 {
