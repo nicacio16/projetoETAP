@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------------------------------------
-//  BIBLIOTECA NECESSÁRIA PARA UTILIZAR O SENSOR ULTRASSÔNICO
+//  BIBLIOTECAS UTILIZADAS
 //--------------------------------------------------------------------------------------------------------
 #include <Ultrasonic.h>
 #include <WiFi.h>
@@ -209,7 +209,7 @@ void callback(char* topic, byte* payload, unsigned int length)
 }
 
 //--------------------------------------------------------------------------------------------------------
-//  FAZ A LEITURA DA DISTANCIA AFERIDA PELO SENSOR ULTRASSÔNICO DA CISTERNA E CONVERTE EM PORCENTAGEM
+//  FAZ A LEITURA DA DISTANCIA AFERIDA PELO SENSOR ULTRASSÔNICO DA CAIXA
 //--------------------------------------------------------------------------------------------------------
 int getDistanceCaixa()
 {
@@ -225,7 +225,7 @@ int getDistanceCaixa()
 }
 
 //--------------------------------------------------------------------------------------------------------
-//  FAZ A LEITURA DA DISTANCIA AFERIDA PELO SENSOR ULTRASSÔNICO DA CISTERNA E CONVERTE EM PORCENTAGEM
+//  FAZ A LEITURA DA DISTANCIA AFERIDA PELO SENSOR ULTRASSÔNICO DA CISTERNA
 //--------------------------------------------------------------------------------------------------------
 int getDistanceCisterna()
 {
