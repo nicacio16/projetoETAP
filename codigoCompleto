@@ -214,9 +214,13 @@ void callback(char* topic, byte* payload, unsigned int length)
 int getDistanceCaixa()
 {
     long microsec = ultrasonicCAIXA.timing();
-    delay(100);
-    distanciaReservatorioCaixa = ultrasonicCAIXA.convert(microsec, Ultrasonic::CM);
-   
+    leituraAtualCaixa = millis();
+
+    if (leituraAtualCaixa - ultimaLeituraCaixa > intervaloLeitura) {
+      ultimaLeituraCaixa = leituraAtualCaixa;
+      distanciaReservatorioCaixa = ultrasonicCAIXA.convert(microsec, Ultrasonic::CM);
+    }
+
     return distanciaReservatorioCaixa;
 }
 
@@ -226,9 +230,13 @@ int getDistanceCaixa()
 int getDistanceCisterna()
 {
     long microsec = ultrasonicCISTERNA.timing();
-    delay(100);
-    distanciaReservatorioCisterna = ultrasonicCISTERNA.convert(microsec, Ultrasonic::CM);
-     
+    leituraAtualCisterna = millis();
+
+    if (leituraAtualCisterna - ultimaLeituraCisterna > intervaloLeitura) {
+      ultimaLeituraCisterna = leituraAtualCisterna;
+      distanciaReservatorioCisterna = ultrasonicCISTERNA.convert(microsec, Ultrasonic::CM);
+    }
+
     return distanciaReservatorioCisterna;
 }
 
